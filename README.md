@@ -69,7 +69,7 @@ PowerShell.exe -ExecutionPolicy Bypass -File .\1PasswordSecretsDump.ps1
 So the ability to properly exfiltrate credentials is also a matter of luck as it is important to be able to run the script before the secrets are deleted from the process memory. Otherwise, you can schedule the script to run automatically at regular intervals or to run based on the visibility or focus of the client window. 😉
 
 ## Known issues
-- If any of the fields within the JSON objects to be exfiltrated contain non-ASCII characters (e.g., emoji) pattern matching will fail.
+- If any of the fields within the JSON objects to be exfiltrated contain non-ASCII characters (e.g., emoji) pattern matching will fail!
 
 ## Contributing
 
