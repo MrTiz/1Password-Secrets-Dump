@@ -100,7 +100,8 @@ $Patterns = @(
     '\{"type":"Success","content":\{"callbackId":\d+,"response":\{"type":"NmRequestAccounts","content":\{"accounts":\[\{"type":"Unlocked","content":\{"details":\{"accountUuid":".+?\}\}\}\}',
     '\{"title":".+?"key_ops":\["encrypt","decrypt"\]\}\}\}\}',
     '\{"ps":[ -~]+?\}\0',
-    '\{"sections":\[\{"[ -~]+\}'
+    '\{"sections":\[\{"[ -~]+\}',
+    '\{"fields":\[\{"value":"[ -~]+\}\]\}'
 )
 
 $Pattern = "($($Patterns -Join '|'))"
