@@ -77,7 +77,7 @@ function MakeTMPFile() {
 
     $Acl = Get-Acl -Path $File
 
-    $Owner 		      = New-Object System.Security.Principal.Ntaccount('NT AUTHORITY\SYSTEM')
+    $Owner            = New-Object System.Security.Principal.Ntaccount('NT AUTHORITY\SYSTEM')
     $SystemAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule('NT AUTHORITY\SYSTEM',    'FullControl', 'Allow')
     $AdminAccessRule  = New-Object System.Security.AccessControl.FileSystemAccessRule('BUILTIN\Administrators', 'FullControl', 'Allow')
 
