@@ -60,7 +60,6 @@ function Out-Minidump {
             $ExceptionMessage = "$($Exception.Message) ($($ProcessName):$($ProcessId))"
 
             Remove-Item -Path $DumpFilePath -Force -ErrorAction SilentlyContinue
-
             throw $ExceptionMessage
         }
     }
@@ -107,7 +106,7 @@ $Patterns = @(
 $Pattern = "($($Patterns -Join '|'))"
 
 foreach ($Process in $Processes) {
-	Out-Minidump -Process $Process -DumpFilePath $File
+    Out-Minidump -Process $Process -DumpFilePath $File
 
     Select-String -Path $File -Pattern $Pattern -AllMatches | 
         ForEach-Object { 
